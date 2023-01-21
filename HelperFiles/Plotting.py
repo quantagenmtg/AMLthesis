@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from Methods_fixed_window_size import Slearners
+from MainFiles.Methods_fixed_window_size import Slearners
 
 # Added xlabel input, might destroy some things?
 def Boxplots(plots, ylabel=None, xlabel=None, hline='N', xrot=False, ylim=None, figsize=(1, 1),

@@ -1,7 +1,7 @@
 import pandas as pd
 import torch
 from numpy.lib.stride_tricks import sliding_window_view
-from Preprocessing import *
+from HelperFiles.Preprocessing import *
 
 
 class Windowing:
@@ -185,3 +185,5 @@ class Windowing:
 
         self.results['Last'] = {}
         self.results['Last']['test error'] = error
+
+    #TODO: Add plotting functions and help

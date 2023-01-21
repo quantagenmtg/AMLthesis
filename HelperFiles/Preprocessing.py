@@ -1,5 +1,6 @@
 import lcdb
 import numpy as np
+import warnings
 
 # Trying out lcdb
 curves = lcdb.get_all_curves()
