@@ -3,7 +3,12 @@ import torch
 from numpy.lib.stride_tricks import sliding_window_view
 from HelperFiles.Preprocessing import *
 
+"""
+Class for windows of fixed size. Deprecated since we do not need it anymore and therefore will not be updated.
+"""
 
+
+#TODO: maybe separate the methods in different files, might be easier to see how to do plotting and such
 class Windowing:
     Slearners = np.array(
         ['SVCl', 'SVCp', 'SVCr', 'SVCs', 'xTrs', 'GrBo', 'rFor', 'LogR', 'PaAg', 'Perc', 'Ridg', 'SGD', 'Bern', 'MuNo',
@@ -64,13 +69,13 @@ class Windowing:
         self.data2 = self.segment[:, :, ind]
 
     def MDS(self, k=4):
-        '''
+        """
         Applies MDS algorithm on all windows to retrieve the regression predictions.
         Saves the absolute error in the prediction. Also saves MDS version where you
         scale /adapt curves before picking them. Original version scales after picking
 
         Uses method 1: Naively pick last in window
-        '''
+        """
         data = np.copy(self.data)
         weights = (2 ** np.arange(self.window_size))[:, None]
 

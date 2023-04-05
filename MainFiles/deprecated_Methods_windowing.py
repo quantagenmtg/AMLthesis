@@ -6,6 +6,8 @@ from HelperFiles.Plotting import Boxplots
 from HelperFiles.Preprocessing import *
 
 """
+Old version of windowing, do not use.
+
 NOTE: This class only works with windows = TRUE
 """
 

@@ -1,11 +1,11 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from MainFiles.Methods_fixed_window_size import Slearners
+from MainFiles.deprecated_Methods_fixed_window_size import Slearners
 
 # Added xlabel input, might destroy some things?
 def Boxplots(plots, ylabel=None, xlabel=None, hline='N', xrot=False, ylim=None, figsize=(1, 1),
-             col=['black', 'red', 'blue', 'green'], legend_loc='upper right', title=None, means=False):
+             col=['black', 'red', 'blue', 'green'], legend_loc='upper right', title=None, means=False, save=None, dpi=800):
     plotlabels = list(plots.keys())
     w, h = *figsize,
     fig, ax = plt.subplots(figsize=(6.4 * w, 4.8 * h))
@@ -47,10 +47,12 @@ def Boxplots(plots, ylabel=None, xlabel=None, hline='N', xrot=False, ylim=None, 
         ax.set_xticklabels(labels)
     if n_dicts != 1:
         ax.legend([box["boxes"][0] for box in boxes], plotlabels, loc=legend_loc)
+    if save:
+        plt.savefig(save, dpi=dpi)
     plt.show()
 
 
-def PlotHeatmap(plots, label=False, min=0, max=1, cmap=None):
+def PlotHeatmap(plots, label=False, min=0, max=1, cmap='seismic', title=None):
     # If we dont put in a list and just want one plot
     if type(plots) == np.ndarray:
         n = 1
@@ -85,8 +87,11 @@ def PlotHeatmap(plots, label=False, min=0, max=1, cmap=None):
         # fig.subplots_adjust(wspace=0.4,hspace=0.4)
         fig.show()
 
+    if title:
+        fig.suptitle(title, y=0.9)
 
-def HeatmapBoxPlot(plots, ylabel=None, hline='N', ylim=None, label=False, min=0, max=1, cmap=None, title=None):
+
+def HeatmapBoxPlot(plots, ylabel=None, hline='N', ylim=None, label=False, min=0, max=1, cmap='seismic', title=None):
     nplots = len(plots)
     fig, ax = plt.subplots(nplots, 2, figsize=[6.4 * (2 + 1), 4.8 * (nplots + 1)])
     axis = ax.flatten()
@@ -111,7 +116,7 @@ def HeatmapBoxPlot(plots, ylabel=None, hline='N', ylim=None, label=False, min=0,
     fig.show()
 
 
-def Compare(algos, truth_reference, ylabel='Difference in Average Absolute Error', hline=0, ylim=None, label=False,
+def Compare(algos, truth_reference, ylabel='Average Difference in Absolute Error', hline=0, ylim=None, label=False,
             min=-1, max=1, cmap='seismic', title=None):
     labels, data = [*zip(*algos.items())]
     shape = truth_reference.shape
@@ -125,6 +130,6 @@ def Compare(algos, truth_reference, ylabel='Difference in Average Absolute Error
             dat2 = np.einsum('ijk -> jki', dat2)
         d.append((dat1, dat2))
 
-    plots = {labels[i]: (np.nanmean(np.abs(d[i][0] - truth_reference), axis=-1) -
-                         np.nanmean(np.abs(d[i][1] - truth_reference), axis=-1)) for i in range(len(labels))}
+    plots = {labels[i]: (np.nanmean(np.abs(d[i][0] - truth_reference) -
+                         np.abs(d[i][1] - truth_reference), axis=0)) for i in range(len(labels))}
     HeatmapBoxPlot(plots, ylabel, hline, ylim, label, min, max, cmap, title)
