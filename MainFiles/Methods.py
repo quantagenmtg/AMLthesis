@@ -13,7 +13,7 @@ class Methods:
     results['MMF'] = {}
     results['Last'] = {}
 
-    def MDS(self, k=4, deprecated_weights=False, include_binary=False):
+    def MDS(self, k=4, deprecated_weights=False):
         """
         Applies MDS algorithm on all windows to retrieve the regression predictions.
         Saves the absolute error in the prediction. Also saves MDS version where you
@@ -30,7 +30,7 @@ class Methods:
         # We have the following shape [new dataset, meta dataset, learner, (point on curve),... extra dims]
         scalar = np.sum(weights * data[None] * data[:, None], axis=3) / np.sum(weights * (data ** 2), axis=2)[None]
         adapted_curves = scalar[:, :, :, None] * data
-        adapted_target = scalar[..., None] * self.target[..., None, :]
+        adapted_target = scalar[..., None] * self.target
         distance = np.sum((data - data[:, None]) ** 2, axis=3)
         distance_adapted = np.sum((adapted_curves - data) ** 2, axis=3)
 
@@ -39,7 +39,7 @@ class Methods:
         distance_adapted = np.repeat(distance_adapted[..., None], len(self.target_anchors), axis=-1)
 
         # Remove curves that can't predict at target
-        ind = np.isnan(self.target).nonzero()
+        ind = np.isnan(self.label).nonzero()
         distance[:, ind[0], ind[1], ..., ind[2]] = np.nan
         distance_adapted[:, ind[0], ind[1], ..., ind[2]] = np.nan
 
@@ -47,66 +47,34 @@ class Methods:
         np.einsum('ii...->i...', distance)[...] = np.nan
         np.einsum('ii...->i...', distance_adapted)[...] = np.nan
 
-        if include_binary:
-            # scale after, just like in the paper
-            distance_sum = distance[:, :, None] + distance[:, :, :, None]
-
         # Take k closest
         part_scale_after = np.argpartition(distance, k, axis=1)[:, :k]
         part_scale_before = np.argpartition(distance_adapted, k, axis=1)[:, :k]
         k_closest_curves_scale_after = np.take_along_axis(adapted_target, part_scale_after, axis=1)
         k_closest_curves_scale_before = np.take_along_axis(adapted_target, part_scale_before, axis=1)
 
-        if include_binary:
-            # We need an extra dimension for the rival learner
-            adapted_target_binary = np.repeat(adapted_target[:, :, :, None], adapted_target.shape[2], axis=3)
-            part_binary = np.argpartition(distance_sum, k, axis=1)[:, :k]
-            k_closest_curves_binary = np.take_along_axis(adapted_target_binary, part_binary, axis=1)
-
         # Predicted target is just the mean of the k closest curves at the target point
         prediction_scale_after = np.mean(k_closest_curves_scale_after, axis=1)
         prediction_scale_before = np.mean(k_closest_curves_scale_before, axis=1)
 
-        # For binary it is a little more complicated, we need the prediction of both learners
-        # then we check which one is larger
-        if include_binary:
-            # For rival learner we can just swap the learner axis
-            k_closest_curves_binary_rival = np.swapaxes(k_closest_curves_binary, 2, 3)
-
-            prediction_l1 = np.mean(k_closest_curves_binary, axis=1)
-            prediction_l2 = np.mean(k_closest_curves_binary_rival, axis=1)
-
-            # Check when l1 wins over l2
-            prediction_binary = (prediction_l1 > prediction_l2).astype(float)
-
-            # Check for ties
-            prediction_binary[prediction_l1 == prediction_l2] = 0.5
-
-            # Return nans as they get removed
-            prediction_binary[np.isnan(prediction_l1)] = np.nan
-            prediction_binary[np.isnan(prediction_l2)] = np.nan
-
-            # Don't compete against same learner
-            np.einsum('ijj...->ij...', prediction_binary)[...] = np.nan
 
         # Remove predictions for anchor points that are in front of the window
-        ind = np.triu_indices(len(self.target_anchors), 1)
-        prediction_scale_after[..., ind[1], ind[0]] = np.nan
-        prediction_scale_before[..., ind[1], ind[0]] = np.nan
-        if include_binary:
-            prediction_binary[..., ind[1], ind[0]] = np.nan
+        #ind = np.triu_indices(len(self.target_anchors), 1)
+        #prediction_scale_after[..., ind[1], ind[0]] = np.nan
+        #prediction_scale_before[..., ind[1], ind[0]] = np.nan
+        prediction_scale_after[self.nan] = np.nan
+        prediction_scale_before[self.nan] = np.nan
 
-        self.results['MDS']['test error'] = np.abs(prediction_scale_after - self.target[:, :, None])
-        self.results['MDS']['(scale before) test error'] = np.abs(prediction_scale_before - self.target[:, :, None])
+        self.results['MDS']['test error'] = np.abs(prediction_scale_after - self.target)
+        self.results['MDS']['(scale before) test error'] = np.abs(prediction_scale_before - self.target)
         self.results['MDS']['regression'] = prediction_scale_after
         self.results['MDS']['(scale before) regression'] = prediction_scale_before
         self.results['MDS']['k closest curves ID'] = part_scale_after
         self.results['MDS']['(scale before) k closest curves ID'] = part_scale_before
         self.results['MDS']['scalar'] = scalar
-        if include_binary:
-            self.results['MDS']['binary'] = prediction_binary
 
-    def MMF(self, steps=500):
+
+    def MMF(self, steps=500, lr = 0.1):
         '''
         Applies MMF algorithm. Tensorized with pytorch so that it calculates quickly
         '''
@@ -129,7 +97,7 @@ class Methods:
         def mmf_func(beta, x):
             return (beta[..., 0] * beta[..., 1] + beta[..., 2] * x ** beta[..., 3]) / (beta[..., 1] + x ** beta[..., 3])
 
-        optimizer = torch.optim.Adam([params], lr=0.1)  # SGD did weird things, Adam works well!
+        optimizer = torch.optim.Adam([params], lr=lr)  # SGD did weird things, Adam works well!
         y = data
         nan = torch.isnan(y)
         y = torch.where(nan, torch.tensor(0.0), y)
@@ -149,24 +117,28 @@ class Methods:
         prediction = mmf_func(params, target_points)
 
         # Remove predictions for anchor points that are in front of the window
-        ind = torch.triu_indices(len(target_points), len(target_points), 1)
-        prediction[:, :, ind[0], ind[1]] = torch.nan
+        #ind = torch.triu_indices(len(target_points), len(target_points), 1)
+        #prediction[:, :, ind[0], ind[1]] = torch.nan
         prediction = torch.einsum('ijkl->ijlk', prediction)
-        self.results['MMF']['test error'] = (prediction - target[:, :, None]).abs().numpy()
+        prediction[self.nan] = np.nan
+        self.results['MMF']['test error'] = (prediction - target).abs().numpy()
+        self.results['MMF']['train error'] = loss.detach().numpy()
         self.results['MMF']['regression'] = prediction.numpy()
         self.results['MMF']['parameters'] = params.numpy()
 
     def Last(self):
 
-        prediction = np.diagonal(self.data, axis1=-2, axis2=-1)
-        error = np.abs(prediction[..., None] - self.target[..., None, :])
+        prediction = np.diagonal(self.data, axis1=-2, axis2=-1).copy()
+        error = np.abs(prediction[..., None] - self.target)
+        regression = self.data.copy()
+        regression[self.nan] = np.nan
 
         # Remove predictions for anchor points that are in front of the window
         ind = np.triu_indices(len(self.target_anchors), 1)
         error[:, :, ind[1], ind[0]] = np.nan
 
         self.results['Last']['test error'] = error
-        self.results['Last']['regression'] = np.repeat(prediction[..., None], len(self.target_anchors), axis=-1)
+        self.results['Last']['regression'] = regression
 
     def MDS_low_budget_binary(self, k=4, deprecated_weights=False):
         """
@@ -182,14 +154,14 @@ class Methods:
 
         # We have the following shape [new dataset, meta dataset, learner, (point on curve),... extra dims]
         scalar = np.sum(weights * data[None] * data[:, None], axis=3) / np.sum(weights * (data ** 2), axis=2)[None]
-        adapted_target = scalar[..., None] * self.target[..., None, :]
+        adapted_target = scalar[..., None] * self.target
         distance = np.sum((data - data[:, None]) ** 2, axis=3)
 
         # extra dim for moving target
         distance = np.repeat(distance[..., None], len(self.target_anchors), axis=-1)
 
         # Remove curves that can't predict at target
-        ind = np.isnan(self.target).nonzero()
+        ind = np.isnan(self.label).nonzero()
         distance[:, ind[0], ind[1], ..., ind[2]] = np.nan
 
         # So that it doesn't pick itself
@@ -233,7 +205,7 @@ class Methods:
 
         prediction_binary = np.array(prediction_binary)
         # Remove predictions for anchor points that are in front of the window
-        ind = np.triu_indices(len(self.target_anchors), 1)
-        prediction_binary[..., ind[1], ind[0]] = np.nan
+        nans = self.nan[:,:,None] + self.nan[:,None]
+        prediction_binary[nans] = np.nan
 
         self.results['MDS']['binary'] = prediction_binary

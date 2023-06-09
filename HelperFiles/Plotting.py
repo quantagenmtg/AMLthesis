@@ -51,6 +51,53 @@ def Boxplots(plots, ylabel=None, xlabel=None, hline='N', xrot=False, ylim=None, 
         plt.savefig(save, dpi=dpi)
     plt.show()
 
+def Meanplots(plots, ylabel=None, xlabel=None, hline='N', xrot=False, ylim=None, figsize=(1, 1),
+             col=['black', 'red', 'blue', 'green'], legend_loc='upper right', title=None, save=None, dpi=800, Q1Q3=True, median=True, ls='--'):
+    plotlabels = list(plots.keys())
+    w, h = *figsize,
+    fig, ax = plt.subplots(figsize=(6.4 * w, 4.8 * h))
+    if ylim:
+        ax.set_ylim(*ylim)
+    if ylabel:
+        ax.set_ylabel(ylabel)
+    if xlabel:
+        ax.set_xlabel(xlabel)
+    if hline != 'N':
+        plt.axhline(hline, linestyle=ls)
+    if title:
+        fig.suptitle(title, y=1)
+
+    n_dicts = len(plots)
+    if type(plots[plotlabels[0]]) != dict:
+        n_dicts = 1
+    for i in range(n_dicts):
+        c = col[i]
+        if n_dicts == 1:
+            labels, data = [*zip(*plots.items())]
+        else:
+            labels, data = [*zip(*plots[plotlabels[i]].items())]
+        data = [np.array(dat)[~np.isnan(np.array(dat))] for dat in data]
+        means = [np.mean(dat) for dat in data]
+        ax.plot(means, c=c, label=plotlabels[i])
+        #dotted line
+        if median:
+            medians = [np.quantile(dat, 0.5) for dat in data]
+            ax.plot(medians, c=c, linestyle='dotted')
+        if Q1Q3:
+            q1s = [np.quantile(dat, 0.25) for dat in data]
+            q3s = [np.quantile(dat, 0.75) for dat in data]
+            ax.fill_between(range(len(labels)), q1s, q3s, alpha=0.2, color=c)
+    pos = np.arange(0, len(labels))
+    ax.set_xticks(pos)
+    if xrot:
+        ax.set_xticklabels(labels, rotation=45, ha='right')
+    else:
+        ax.set_xticklabels(labels)
+    if n_dicts != 1:
+        ax.legend(loc=legend_loc)
+    if save:
+        plt.savefig(save, dpi=dpi)
+    plt.show()
 
 def PlotHeatmap(plots, label=False, min=0, max=1, cmap='seismic', title=None):
     # If we dont put in a list and just want one plot

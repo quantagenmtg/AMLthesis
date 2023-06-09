@@ -46,6 +46,11 @@ class Windowing(Methods):
         # shape is [dataset,learner,point]
         self.dataframe = _['score_test'].values.reshape(len(self.datasets), len(self.learners), len(self.points))
 
+        # Some datasets start at a later anchor point, we remove them by replacing with nan
+        # at the time of writing this it is only 3 datasets
+        id = np.where(np.isnan(self.dataframe[:,:,0]).sum(axis = -1) == len(self.learners))[0]
+        self.dataframe[id] = np.nan
+
     def set_points(self, anchor_points):
 
         self.anchor_points = np.array([anchor_points]).reshape(-1)  # To get right shape
@@ -62,12 +67,21 @@ class Windowing(Methods):
         # Split all possible windows and target points
         # Use the sliding_window_view() function to create a view of the array with sliding windows
         self.train = self.segment[:, :, :-1]
-        self.target = self.segment[:, :, 1:]
+        self.label = self.segment[:, :, 1:]
 
         # Make all the windows, another dimension is added at the end for this [..., window]
         self.data = np.repeat(self.train[..., None], self.train.shape[2], -1)
         self.triu = np.triu_indices(self.train.shape[2], 1)
         self.data[..., self.triu[1], self.triu[0]] = np.nan
+
+        # Get nans so that we can fill them in later for the methods
+        # nans are where there is no target or no complete window
+        self.target = np.repeat(self.label[..., None], self.label.shape[2], -1)
+        # swap last two axes
+        self.target = np.swapaxes(self.target, -1, -2)
+        nan = np.isnan(self.data)
+        self.target[nan] = np.nan
+        self.nan = np.isnan(self.target)
 
     def _returnIDs(self, dataset=slice(None), learner=slice(None), window=slice(None), target=slice(None)):
 
@@ -106,14 +120,15 @@ class Windowing(Methods):
         # Curve points, we also take the regularised points and put them back in to see
         ax.scatter(self.train_anchors[:windowID + 1], self.segment[datasetID, learnerID][:windowID + 1], color='blue',
                    marker='o', label='Curve points (given)')
-        ax.scatter(self.target_anchors[targetID], self.target[datasetID, learnerID, targetID], color='red', label='Target point')
+        ax.scatter(self.target_anchors[targetID], self.label[datasetID, learnerID, targetID], color='red', label='Target point')
 
-        if np.isnan(self.target[datasetID, learnerID, targetID]):
+        if np.isnan(self.label[datasetID, learnerID, targetID]):
             warnings.warn("Given curve has no value at target point. Predictions can still be made and shown "
                           "but are not used in the error calculations.", UserWarning)
 
         stopID = np.where(self.points == self.target_anchors[targetID])[0][0]
-        ax.scatter(self.points[:stopID], self.dataframe[datasetID, learnerID, :stopID], color='blue', marker='x',
+        startID = np.where(self.points == self.train_anchors[windowID])[0][0]
+        ax.scatter(self.points[startID+1:stopID], self.dataframe[datasetID, learnerID, startID+1:stopID], color='blue', marker='x',
                    label='Curve points')
 
         # MMF prediction plot
