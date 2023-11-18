@@ -16,3 +16,27 @@ and Brazdil in [Predicting relative performance of classifiers from samples](htt
 - HelperFiles: Contains files for plotting and preprocessing of Learning Curve Database (LCDB)
 - MainFiles: Contains the classes that perform the extrapolation techniques
 - Plots: Contains the plots that are made in the experiments
+
+# Learning algorithms included in the comparison
+| learning algorithm            | abreviation |
+|-------------------------------|-------------|
+| SVClinear                     | SVCl        |
+| SVCpoly                       | SVCp        |
+| SVCrbf                        | SVCr        |
+| SVCsigmoid                    | SVCs        |
+| ExtraTreesClassifier          | xTrs        |
+| GradientBoostingClassifier    | GrBo        |
+| RandomForestClassifier        | rFor        |
+| LogisticRegression            | LogR        |
+| PassiveAggressiveClassifier   | PaAg        |
+| Perceptron                    | Perc        |
+| RidgeClassifier               | Ridg        |
+| SGDClassifier                 | SGD         |
+| BernoulliNB                   | Bern        |
+| MultinomialNB                 | MuNo        |
+| KNeighborsClassifier          | KNei        |
+| MLPClassifier                 | MLP         |
+| DecisionTreeClassifier        | dTre        |
+| ExtraTreeClassifier           | xTre        |
+| LinearDiscriminantAnalysis    | linD        |
+| QuadraticDiscriminantAnalysis | QuaD        |
